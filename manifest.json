@@ -1,0 +1,11 @@
+{
+  "asset_id": "ASSET-FIRST-RUBLE-8b46973cf887",
+  "ownership": "OWNER_OWNED",
+  "mission": "FIRST_RUBLE",
+  "spend_rub": 0,
+  "functional": true,
+  "payment_network": "Base",
+  "payment_currency": "USDC",
+  "price_usdc_units": 10008,
+  "created_at_utc": "2026-09-05T23:57:52.829175+00:00"
+}

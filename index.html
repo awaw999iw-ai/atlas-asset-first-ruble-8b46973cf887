@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JSON Utility G8</title>
+<meta name="description"
+content="Fast browser JSON formatter, sorter and cleaner.">
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 920px;
+  margin: 32px auto;
+  padding: 0 18px;
+  line-height: 1.45;
+}
+textarea {
+  width: 100%;
+  min-height: 250px;
+  box-sizing: border-box;
+  font-family: monospace;
+}
+button {
+  padding: 10px 14px;
+  margin: 6px 4px 6px 0;
+}
+.card {
+  border: 1px solid #aaa;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px 0;
+}
+code {
+  word-break: break-all;
+}
+</style>
+</head>
+
+<body>
+
+<h1>JSON Utility G8</h1>
+
+<p>
+Format, minify and sort JSON directly in your browser.
+The data stays in the browser.
+</p>
+
+<div class="card">
+
+<textarea id="input"
+placeholder='{"hello":"world","items":[3,2,1]}'></textarea>
+
+<br>
+
+<button onclick="formatJSON()">Format</button>
+<button onclick="minifyJSON()">Minify</button>
+<button onclick="sortJSON()">Sort keys</button>
+
+<button
+id="exportButton"
+onclick="exportJSON()"
+disabled>
+Supporter export 🔒
+</button>
+
+<p id="status"></p>
+
+</div>
+
+<div class="card">
+
+<h2>Supporter unlock</h2>
+
+<p>
+Send exactly
+<strong>0.010008 USDC</strong>
+on <strong>Base</strong> to:
+</p>
+
+<p>
+<code>0xD42334A84E6d262D1213d75f5792B9bA0BdE9142</code>
+</p>
+
+<p>
+Then paste the transaction hash below.
+The transfer is verified against Base.
+</p>
+
+<input
+id="tx"
+style="width:100%;box-sizing:border-box;padding:10px"
+placeholder="0x transaction hash">
+
+<br><br>
+
+<button onclick="verifyPayment()">
+Verify payment
+</button>
+
+<p id="payStatus"></p>
+
+</div>
+
+<small>
+Asset ASSET-FIRST-RUBLE-8b46973cf887.
+Owner-owned.
+Atlas spend: 0 RUB.
+</small>
+
+
+<script>
+
+const RPC =
+  "https://mainnet.base.org";
+
+const USDC =
+  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".toLowerCase();
+
+const TRANSFER_TOPIC =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef".toLowerCase();
+
+const PAY_TO =
+  "0xD42334A84E6d262D1213d75f5792B9bA0BdE9142".toLowerCase();
+
+const REQUIRED =
+  BigInt("10008");
+
+
+function parseInput() {
+  return JSON.parse(
+    document.getElementById("input").value
+  );
+}
+
+
+function formatJSON() {
+  try {
+    document.getElementById("input").value =
+      JSON.stringify(
+        parseInput(),
+        null,
+        2
+      );
+
+    document.getElementById("status").textContent =
+      "Formatted.";
+
+  } catch (e) {
+    document.getElementById("status").textContent =
+      e.message;
+  }
+}
+
+
+function minifyJSON() {
+  try {
+    document.getElementById("input").value =
+      JSON.stringify(
+        parseInput()
+      );
+
+    document.getElementById("status").textContent =
+      "Minified.";
+
+  } catch (e) {
+    document.getElementById("status").textContent =
+      e.message;
+  }
+}
+
+
+function deepSort(value) {
+
+  if (Array.isArray(value)) {
+    return value.map(deepSort);
+  }
+
+  if (
+    value
+    && typeof value === "object"
+  ) {
+    const out = {};
+
+    Object.keys(value)
+      .sort()
+      .forEach(
+        key => {
+          out[key] =
+            deepSort(value[key]);
+        }
+      );
+
+    return out;
+  }
+
+  return value;
+}
+
+
+function sortJSON() {
+  try {
+    document.getElementById("input").value =
+      JSON.stringify(
+        deepSort(
+          parseInput()
+        ),
+        null,
+        2
+      );
+
+    document.getElementById("status").textContent =
+      "Keys sorted.";
+
+  } catch (e) {
+    document.getElementById("status").textContent =
+      e.message;
+  }
+}
+
+
+function exportJSON() {
+
+  const blob =
+    new Blob(
+      [
+        document.getElementById("input").value
+      ],
+      {
+        type:
+          "application/json"
+      }
+    );
+
+  const link =
+    document.createElement("a");
+
+  link.href =
+    URL.createObjectURL(blob);
+
+  link.download =
+    "clean.json";
+
+  link.click();
+
+  URL.revokeObjectURL(
+    link.href
+  );
+}
+
+
+async function rpc(
+  method,
+  params
+) {
+
+  const response =
+    await fetch(
+      RPC,
+      {
+        method: "POST",
+
+        headers: {
+          "content-type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: method,
+            params: params
+          })
+      }
+    );
+
+  const obj =
+    await response.json();
+
+  if (obj.error) {
+    throw new Error(
+      obj.error.message
+    );
+  }
+
+  return obj.result;
+}
+
+
+function topicAddress(address) {
+  return (
+    "0x"
+    + address
+      .replace("0x", "")
+      .padStart(64, "0")
+  );
+}
+
+
+async function verifyPayment() {
+
+  const out =
+    document.getElementById(
+      "payStatus"
+    );
+
+  const tx =
+    document.getElementById(
+      "tx"
+    ).value.trim();
+
+  out.textContent =
+    "Checking Base...";
+
+  try {
+
+    const receipt =
+      await rpc(
+        "eth_getTransactionReceipt",
+        [tx]
+      );
+
+    if (!receipt) {
+      throw new Error(
+        "Transaction not found yet."
+      );
+    }
+
+    let valid = false;
+
+    const expectedRecipient =
+      topicAddress(PAY_TO);
+
+    for (
+      const log
+      of receipt.logs || []
+    ) {
+
+      if (
+        (log.address || "")
+        .toLowerCase()
+        !== USDC
+      ) {
+        continue;
+      }
+
+      const topics =
+        (log.topics || [])
+        .map(
+          item =>
+            item.toLowerCase()
+        );
+
+      if (
+        topics[0]
+        !== TRANSFER_TOPIC
+      ) {
+        continue;
+      }
+
+      if (
+        topics[2]
+        !== expectedRecipient
+      ) {
+        continue;
+      }
+
+      const value =
+        BigInt(
+          log.data
+        );
+
+      if (
+        value === REQUIRED
+      ) {
+        valid = true;
+        break;
+      }
+    }
+
+    if (!valid) {
+      throw new Error(
+        "Matching USDC payment not found."
+      );
+    }
+
+    localStorage.setItem(
+      "ASSET-FIRST-RUBLE-8b46973cf887-paid",
+      tx
+    );
+
+    document.getElementById(
+      "exportButton"
+    ).disabled = false;
+
+    out.textContent =
+      "✅ Payment verified. Export unlocked.";
+
+  } catch (e) {
+
+    out.textContent =
+      "❌ " + e.message;
+  }
+}
+
+
+if (
+  localStorage.getItem(
+    "ASSET-FIRST-RUBLE-8b46973cf887-paid"
+  )
+) {
+  document.getElementById(
+    "exportButton"
+  ).disabled = false;
+}
+
+</script>
+
+</body>
+</html>
